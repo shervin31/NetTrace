@@ -177,10 +177,9 @@ elif page == "Flagged Accounts":
         'degree_ratio':          'Send/Receive Ratio',
         'is_fraud':              'Confirmed Fraud',
     })
-    display = display[[c for c in ['Account ID', 'Risk Score', 'Network Risk (GNN)', 'Avg Balance Drained', 'Sends to Empty Accounts', 'Send/Receive Ratio', 'Confirmed Fraud'] if c in display.columns]]
-    display = display.reset_index(drop=True)
+    display = display.reindex(columns=['Account ID', 'Risk Score', 'Network Risk (GNN)', 'Avg Balance Drained', 'Sends to Empty Accounts', 'Send/Receive Ratio', 'Confirmed Fraud'])
 
-    st.dataframe(display, use_container_width=True, height=600)
+    st.dataframe(display, use_container_width=True, height=600, hide_index=True)
 
 elif page == "Model Performance":
     st.header("Model Performance")
