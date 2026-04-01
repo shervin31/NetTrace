@@ -48,7 +48,7 @@ threshold = D.get('threshold', 0.5)
 
 page = st.sidebar.radio(
     "Page",
-    ["Overview", "Flagged Accounts", "Model Performance", "How It Works"]
+    ["Overview", "Flagged Accounts", "Model Performance", "Financial Impact", "How It Works"]
 )
 
 st.sidebar.write(f"Accounts: {total_accounts:,}")
@@ -60,10 +60,13 @@ st.sidebar.write(f"Threshold: {threshold:.2f}")
 
 if page == "Overview":
     st.header("Overview")
+
+    confirmed = len(flagged[flagged['is_fraud'] == 1])
+
     st.markdown(
-        """
+        f"""
         <div style='font-size:22px; font-weight:600; margin-bottom:8px;'>
-            NetTrace analyzed 79,650 accounts and surfaced 10,973 confirmed fraud accounts.
+            NetTrace analyzed {total_accounts:,} accounts and surfaced {confirmed:,} confirmed fraud accounts.
         </div>
         <div style='font-size:18px; color:#b8c7d9; margin-bottom:28px;'>
             The system scans transaction behavior as a network, not just one transaction at a time,
@@ -72,8 +75,6 @@ if page == "Overview":
         """,
         unsafe_allow_html=True
     )
-
-    confirmed = len(flagged[flagged['is_fraud'] == 1])
     false_pos = len(flagged[flagged['is_fraud'] == 0])
     missed = max(total_fraud_nodes - confirmed, 0)
 
@@ -102,84 +103,50 @@ if page == "Overview":
             height=520,
             showlegend=True,
             margin=dict(l=20, r=20, t=60, b=20),
-            paper_bgcolor="#0e1117",
-            plot_bgcolor="#0e1117",
-            font=dict(size=16, color="white")
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(size=16)
         )
 
         st.plotly_chart(fig, use_container_width=True)
 
     with col_right:
-        st.markdown(
-            f"""
-            <div style='background:#111827; padding:22px; border-radius:14px; margin-bottom:18px;'>
-                <div style='font-size:20px; font-weight:600; margin-bottom:10px;'>Headline Result</div>
-                <div style='font-size:17px; line-height:1.7;'>
-                    Out of <b>{total_accounts:,}</b> accounts analyzed, NetTrace identified
-                    <b>{confirmed:,}</b> confirmed fraud accounts.
-                </div>
-            </div>
-
-            <div style='background:#111827; padding:22px; border-radius:14px; margin-bottom:18px;'>
-                <div style='font-size:20px; font-weight:600; margin-bottom:10px;'>Why it matters</div>
-                <div style='font-size:17px; line-height:1.7;'>
-                    When the system raises an alert, it is correct about <b>{precision:.1%}</b> of the time.
-                    That makes it useful for investigators who need higher-confidence leads.
-                </div>
-            </div>
-
-            <div style='background:#111827; padding:22px; border-radius:14px;'>
-                <div style='font-size:20px; font-weight:600; margin-bottom:10px;'>Model strength</div>
-                <div style='font-size:17px; line-height:1.7;'>
-                    The model achieved an <b>AUC of {auc:.4f}</b>, meaning it is strong at separating
-                    fraudulent accounts from clean accounts based on network behavior.
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
+        st.info(
+            f"**Headline Result**\n\n"
+            f"Out of **{total_accounts:,}** accounts analyzed, NetTrace identified "
+            f"**{confirmed:,}** confirmed fraud accounts."
+        )
+        st.info(
+            f"**Why it matters**\n\n"
+            f"When the system raises an alert, it is correct about **{precision:.1%}** of the time. "
+            f"That makes it useful for investigators who need higher-confidence leads."
+        )
+        st.info(
+            f"**Model strength**\n\n"
+            f"The model achieved an **AUC of {auc:.4f}**, meaning it is strong at separating "
+            f"fraudulent accounts from clean accounts based on network behavior."
         )
 
     st.markdown("### Quick insights")
 
     i1, i2, i3 = st.columns(3)
     with i1:
-        st.markdown(
-            """
-            <div style='background:#111827; padding:20px; border-radius:14px; min-height:170px;'>
-                <div style='font-size:19px; font-weight:600; margin-bottom:10px;'>Network-based detection</div>
-                <div style='font-size:16px; line-height:1.7;'>
-                    NetTrace does not just score transactions individually. It looks at how accounts are connected,
-                    which helps reveal coordinated fraud.
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
+        st.info(
+            "**Network-based detection**\n\n"
+            "NetTrace does not just score transactions individually. It looks at how accounts are connected, "
+            "which helps reveal coordinated fraud."
         )
     with i2:
-        st.markdown(
-            """
-            <div style='background:#111827; padding:20px; border-radius:14px; min-height:170px;'>
-                <div style='font-size:19px; font-weight:600; margin-bottom:10px;'>High-confidence flags</div>
-                <div style='font-size:16px; line-height:1.7;'>
-                    The system is designed to produce useful alerts rather than flooding investigators
-                    with too many low-quality false alarms.
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
+        st.info(
+            "**High-confidence flags**\n\n"
+            "The system is designed to produce useful alerts rather than flooding investigators "
+            "with too many low-quality false alarms."
         )
     with i3:
-        st.markdown(
-            """
-            <div style='background:#111827; padding:20px; border-radius:14px; min-height:170px;'>
-                <div style='font-size:19px; font-weight:600; margin-bottom:10px;'>Communicable results</div>
-                <div style='font-size:16px; line-height:1.7;'>
-                    The output is meant to be explainable: how many accounts were scanned, how many fraud cases were found,
-                    and how strong the model performed overall.
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
+        st.info(
+            "**Communicable results**\n\n"
+            "The output is meant to be explainable: how many accounts were scanned, how many fraud cases were found, "
+            "and how strong the model performed overall."
         )
 
 elif page == "Flagged Accounts":
@@ -198,7 +165,22 @@ elif page == "Flagged Accounts":
     ]
     cols = [c for c in cols if c in view.columns]
 
-    st.dataframe(view[cols].head(200), use_container_width=True, height=600)
+    display = view[cols].head(200).copy()
+    display['ensemble_score'] = display['ensemble_score'].round(3)
+    display['is_fraud'] = display['is_fraud'].map({1: 'Yes', 0: 'No'})
+    display = display.rename(columns={
+        'node':                  'Account ID',
+        'ensemble_score':        'Risk Score',
+        'graphsage_probability': 'Network Risk (GNN)',
+        'avg_balance_drop':      'Avg Balance Drained',
+        'dest_empty_rate':       'Sends to Empty Accounts',
+        'degree_ratio':          'Send/Receive Ratio',
+        'is_fraud':              'Confirmed Fraud',
+    })
+    display = display[[c for c in ['Account ID', 'Risk Score', 'Network Risk (GNN)', 'Avg Balance Drained', 'Sends to Empty Accounts', 'Send/Receive Ratio', 'Confirmed Fraud'] if c in display.columns]]
+    display = display.reset_index(drop=True)
+
+    st.dataframe(display, use_container_width=True, height=600)
 
 elif page == "Model Performance":
     st.header("Model Performance")
@@ -232,6 +214,43 @@ elif page == "Model Performance":
     fig3 = px.line(pr_df, x="recall", y="precision", hover_data=["threshold", "flagged"])
     fig3.update_layout(height=350)
     st.plotly_chart(fig3, use_container_width=True)
+
+elif page == "Financial Impact":
+    st.header("Financial Impact")
+
+    total_at_risk = D.get('total_at_risk', 0.0)
+    flagged_amt = D.get('flagged_with_amounts', flagged).copy()
+
+    fraud_accounts = flagged_amt[flagged_amt['is_fraud'] == 1]
+    n_fraud = len(fraud_accounts)
+    avg_per_account = total_at_risk / n_fraud if n_fraud > 0 else 0.0
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total at risk", f"${total_at_risk:,.0f}")
+    m2.metric("Confirmed fraud accounts", f"{n_fraud:,}")
+    m3.metric("Avg amount per fraud account", f"${avg_per_account:,.0f}")
+
+    st.markdown("### Top 20 fraud accounts by total sent")
+
+    if 'total_sent' in flagged_amt.columns:
+        top20 = (
+            fraud_accounts[['node', 'total_sent']]
+            .sort_values('total_sent', ascending=False)
+            .head(20)
+        )
+        bar_fig = px.bar(
+            top20, x='node', y='total_sent',
+            labels={'node': 'Account', 'total_sent': 'Total Sent ($)'},
+        )
+        bar_fig.update_layout(
+            height=450,
+            xaxis_tickangle=-45,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+        )
+        st.plotly_chart(bar_fig, use_container_width=True)
+    else:
+        st.info("Amount data not available in results.pkl. Re-run export_results.py.")
 
 elif page == "How It Works":
     st.markdown("<h1 style='font-size:36px'>How NetTrace Works</h1>", unsafe_allow_html=True)

@@ -1,10 +1,10 @@
 # layer1_ingestion.py
 
 import pandas as pd
+import numpy as np
 import os
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FILEPATH = os.path.join(BASE_DIR, "data", "transactions.csv")
+FILEPATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'transactions.csv')
 
 
 def load_data(filepath=FILEPATH):
@@ -33,17 +33,11 @@ def simulate_stream(df, batch_size=500):
 
 
 def engineer_features(df):
-    df['balance_drop_ratio'] = df.apply(
-        lambda r: r['amount'] / r['oldbalanceOrg']
-        if r['oldbalanceOrg'] > 0 else 0, axis=1
-    )
+    df['balance_drop_ratio'] = np.where(df['oldbalanceOrg'] > 0, df['amount'] / df['oldbalanceOrg'], 0).clip(0, 1)
     df['dest_balance_increase'] = (
         df['newbalanceDest'] - df['oldbalanceDest']
     )
-    df['amount_to_balance_ratio'] = df.apply(
-        lambda r: r['amount'] / r['oldbalanceOrg']
-        if r['oldbalanceOrg'] > 0 else 1.0, axis=1
-    )
+    df['amount_to_balance_ratio'] = np.where(df['oldbalanceOrg'] > 0, df['newbalanceOrig'] / df['oldbalanceOrg'], 0).clip(0, 1)
     df['dest_was_empty'] = (df['oldbalanceDest'] == 0).astype(int)
 
     print(f"\nFeatures engineered:")

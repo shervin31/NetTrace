@@ -1,5 +1,3 @@
-results · PY
-Copy
 
 # export_results.py
 # Run this ONCE before launching the dashboard:
@@ -14,119 +12,21 @@ import random
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.functional as F
- 
-from sklearn.ensemble import IsolationForest
-from sklearn.preprocessing import StandardScaler
+
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import train_test_split
-from community import best_partition
-from torch_geometric.data import Data
-from torch_geometric.nn import SAGEConv
- 
+
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from layer1_ingestion import load_data, clean_data, engineer_features
 from layer2_graph import stratified_sample, build_graph
- 
+from utils import (GraphSAGE, engineer_node_features, build_pyg_data,
+                   run_clustering, run_isolation_forest)
+
 random.seed(42)
 np.random.seed(42)
 torch.manual_seed(42)
- 
- 
-class GraphSAGE(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels):
-        super().__init__()
-        self.conv1 = SAGEConv(in_channels, hidden_channels)
-        self.conv2 = SAGEConv(hidden_channels, out_channels)
- 
-    def forward(self, x, edge_index):
-        x = self.conv1(x, edge_index)
-        x = F.relu(x)
-        x = F.dropout(x, p=0.3, training=self.training)
-        x = self.conv2(x, edge_index)
-        return F.log_softmax(x, dim=1)
- 
- 
-def engineer_node_features(G, df):
-    account_stats = {}
-    for _, row in df.iterrows():
-        for acct in [row['nameOrig'], row['nameDest']]:
-            if acct not in account_stats:
-                account_stats[acct] = {
-                    'balance_drops': [], 'amount_to_balance': [],
-                    'dest_empty': [], 'dest_increases': []
-                }
-        s = row['nameOrig']
-        account_stats[s]['balance_drops'].append(row['balance_drop_ratio'])
-        account_stats[s]['amount_to_balance'].append(row['amount_to_balance_ratio'])
-        account_stats[s]['dest_empty'].append(row['dest_was_empty'])
-        account_stats[s]['dest_increases'].append(row['dest_balance_increase'])
- 
-    rows = []
-    seen = set()
-    for node in G.nodes():
-        if node in seen:
-            continue
-        seen.add(node)
-        in_deg   = G.in_degree(node)
-        out_deg  = G.out_degree(node)
-        is_fraud = G.nodes[node].get('is_fraud', 0)
-        stats    = account_stats.get(node)
-        degree_ratio = out_deg / in_deg if in_deg > 0 else 0.0
-        if stats and stats['balance_drops']:
-            avg_bd  = np.mean(stats['balance_drops'])
-            avg_ab  = np.mean(stats['amount_to_balance'])
-            de_rate = np.mean(stats['dest_empty'])
-            avg_di  = np.mean(stats['dest_increases'])
-        else:
-            avg_bd = avg_ab = de_rate = avg_di = 0.0
-        rows.append({
-            'node': node, 'in_degree': in_deg, 'out_degree': out_deg,
-            'degree_ratio': round(degree_ratio, 4),
-            'avg_balance_drop': round(avg_bd, 4),
-            'avg_amount_to_balance': round(avg_ab, 4),
-            'dest_empty_rate': round(de_rate, 4),
-            'avg_dest_increase': round(avg_di, 4),
-            'is_fraud': is_fraud
-        })
-    return pd.DataFrame(rows)
- 
- 
-def build_pyg_data(G, features_df):
-    feature_cols = [
-        'in_degree', 'out_degree', 'degree_ratio',
-        'avg_balance_drop', 'avg_amount_to_balance',
-        'dest_empty_rate', 'avg_dest_increase'
-    ]
-    nodes = list(features_df['node'])
-    node_to_idx = {n: i for i, n in enumerate(nodes)}
-    scaler = StandardScaler()
-    X = scaler.fit_transform(features_df[feature_cols].values)
-    x = torch.tensor(X, dtype=torch.float)
-    y = torch.tensor(features_df['is_fraud'].values, dtype=torch.long)
-    edge_list = [
-        [node_to_idx[s], node_to_idx[d]]
-        for s, d in G.edges()
-        if s in node_to_idx and d in node_to_idx
-    ]
-    edge_index = (
-        torch.tensor(edge_list, dtype=torch.long).t().contiguous()
-        if edge_list else torch.zeros((2, 0), dtype=torch.long)
-    )
-    n = len(nodes)
-    train_idx, test_idx = train_test_split(
-        np.arange(n), test_size=0.2, random_state=42,
-        stratify=features_df['is_fraud'].values
-    )
-    train_mask = torch.zeros(n, dtype=torch.bool)
-    test_mask  = torch.zeros(n, dtype=torch.bool)
-    train_mask[train_idx] = True
-    test_mask[test_idx]   = True
-    return Data(x=x, edge_index=edge_index, y=y,
-                train_mask=train_mask, test_mask=test_mask), node_to_idx, scaler
- 
- 
+
+
 def run_graphsage(features_df, G, epochs=150):
     data, _, _ = build_pyg_data(G, features_df)
     n_clean = (features_df['is_fraud'] == 0).sum()
@@ -136,7 +36,12 @@ def run_graphsage(features_df, G, epochs=150):
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
     criterion = torch.nn.NLLLoss(weight=weight)
     loss_history = []
-    print(f"Training GraphSAGE for {epochs} epochs...")
+    best_auc = 0.0
+    best_weights = None
+    patience = 30
+    min_delta = 1e-4
+    epochs_no_improve = 0
+    print(f"Training GraphSAGE for {epochs} epochs (patience={patience})...")
     for epoch in range(epochs):
         model.train()
         optimizer.zero_grad()
@@ -145,8 +50,24 @@ def run_graphsage(features_df, G, epochs=150):
         loss.backward()
         optimizer.step()
         loss_history.append(float(loss.item()))
+        model.eval()
+        with torch.no_grad():
+            val_probs = torch.exp(model(data.x, data.edge_index))[:, 1].numpy()
+            val_probs_test = val_probs[data.test_mask.numpy()]
+            y_val = data.y[data.test_mask].numpy()
+        val_auc = roc_auc_score(y_val, val_probs_test)
+        if val_auc > best_auc + min_delta:
+            best_auc = val_auc
+            best_weights = {k: v.clone() for k, v in model.state_dict().items()}
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
         if (epoch + 1) % 30 == 0:
-            print(f"  Epoch {epoch+1}/{epochs} — Loss: {loss.item():.4f}")
+            print(f"  Epoch {epoch+1}/{epochs} — Loss: {loss.item():.4f}  Val AUC: {val_auc:.4f}")
+        if epochs_no_improve >= patience:
+            print(f"  Early stopping at epoch {epoch+1} (no improvement for {patience} epochs)")
+            break
+    model.load_state_dict(best_weights)
     model.eval()
     with torch.no_grad():
         out        = model(data.x, data.edge_index)
@@ -154,34 +75,10 @@ def run_graphsage(features_df, G, epochs=150):
         probs_test = probs_all[data.test_mask.numpy()]
         y_test     = data.y[data.test_mask].numpy()
     auc = roc_auc_score(y_test, probs_test)
-    print(f"AUC: {auc:.4f}")
+    print(f"AUC: {auc:.4f} (best val AUC: {best_auc:.4f})")
     features_df = features_df.copy()
     features_df['graphsage_probability'] = probs_all
     return features_df, loss_history, y_test, probs_test, auc
- 
- 
-def run_clustering(G, features_df):
-    partition = best_partition(G.to_undirected(), randomize=False)
-    features_df = features_df.copy()
-    features_df['community'] = features_df['node'].map(partition)
-    cs = (features_df.groupby('community')['is_fraud']
-          .agg(['mean', 'count']).reset_index())
-    cs.columns = ['community', 'fraud_rate', 'size']
-    cs = cs[cs['size'] >= 5].sort_values('fraud_rate', ascending=False)
-    return features_df, cs
- 
- 
-def run_isolation_forest(features_df):
-    feature_cols = [
-        'in_degree', 'out_degree', 'degree_ratio',
-        'avg_balance_drop', 'avg_amount_to_balance',
-        'dest_empty_rate', 'avg_dest_increase'
-    ]
-    X = StandardScaler().fit_transform(features_df[feature_cols])
-    raw = IsolationForest(contamination=0.2, random_state=42).fit_predict(X)
-    features_df = features_df.copy()
-    features_df['anomaly_signal'] = (raw == -1).astype(int)
-    return features_df
  
  
 def compute_ensemble(features_df, threshold=0.5):
@@ -190,8 +87,8 @@ def compute_ensemble(features_df, threshold=0.5):
         features_df['community_fraud_rate'] / max_fr if max_fr > 0 else 0.0
     )
     features_df['ensemble_score'] = (
-        0.60 * features_df['graphsage_probability'] +
-        0.25 * features_df['community_signal'] +
+        0.75 * features_df['graphsage_probability'] +
+        0.10 * features_df['community_signal'] +
         0.15 * features_df['anomaly_signal']
     )
     flagged      = features_df[features_df['ensemble_score'] > threshold].copy()
@@ -257,7 +154,7 @@ if __name__ == "__main__":
         features_df, G, epochs=150
     )
  
-    THRESHOLD = 0.5
+    THRESHOLD = 0.6
     results, flagged, precision, recall = compute_ensemble(features_df, THRESHOLD)
     flagged_set = set(flagged['node'])
  
@@ -287,7 +184,7 @@ if __name__ == "__main__":
         'recall':             float(recall),
         'auc':                float(auc),
         'threshold':          THRESHOLD,
-        'weights':            {'graphsage': 0.60, 'community': 0.25, 'anomaly': 0.15},
+        'weights':            {'graphsage': 0.75, 'community': 0.10, 'anomaly': 0.15},
         'pr_curve':           pr_curve,
         'loss_history':       loss_history,
         'y_test':             y_test,
