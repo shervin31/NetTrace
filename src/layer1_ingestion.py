@@ -1,8 +1,10 @@
 # layer1_ingestion.py
 
 import pandas as pd
+import os
 
-FILEPATH = r"C:\Users\Shervin Zare\Downloads\Portfolio Projects\NetTrace\data\transactions.csv"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FILEPATH = os.path.join(BASE_DIR, "data", "transactions.csv")
 
 
 def load_data(filepath=FILEPATH):
