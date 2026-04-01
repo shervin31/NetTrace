@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetTrace — Project Report</title>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 11pt; }
+  body {
+    font-family: 'Georgia', serif;
+    color: #1a1a2e;
+    background: #fff;
+    line-height: 1.7;
+    padding: 0;
+  }
+
+  /* ── Print settings ── */
+  @page { size: A4; margin: 18mm 18mm 18mm 18mm; }
+  @media print {
+    .no-print { display: none; }
+    .page-break { page-break-before: always; }
+    body { font-size: 10pt; }
+    pre { font-size: 7.5pt !important; }
+  }
+
+  /* ── Layout ── */
+  .page { max-width: 820px; margin: 0 auto; padding: 40px 48px; }
+
+  /* ── Cover ── */
+  .cover {
+    min-height: 280px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1a4a8a 100%);
+    color: #fff;
+    border-radius: 12px;
+    padding: 52px 52px 44px;
+    margin-bottom: 48px;
+  }
+  .cover h1 { font-size: 2.6em; letter-spacing: -0.5px; margin-bottom: 8px; font-weight: 700; }
+  .cover .subtitle { font-size: 1.15em; color: #93c5fd; margin-bottom: 28px; font-style: italic; }
+  .cover .meta { font-size: 0.88em; color: #cbd5e1; line-height: 2; }
+  .cover .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 0.82em;
+    margin: 4px 4px 0 0;
+    color: #e2e8f0;
+  }
+
+  /* ── Section headings ── */
+  h2 {
+    font-size: 1.5em;
+    color: #0f172a;
+    border-bottom: 3px solid #1e40af;
+    padding-bottom: 6px;
+    margin: 44px 0 18px;
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 1.12em;
+    color: #1e3a5f;
+    margin: 28px 0 10px;
+    font-weight: 700;
+  }
+  p { margin-bottom: 12px; }
+
+  /* ── Result cards ── */
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin: 24px 0 32px;
+  }
+  .result-card {
+    background: linear-gradient(135deg, #1e40af, #1d4ed8);
+    color: #fff;
+    border-radius: 10px;
+    padding: 20px 16px;
+    text-align: center;
+  }
+  .result-card .val { font-size: 1.9em; font-weight: 700; line-height: 1.1; }
+  .result-card .lbl { font-size: 0.78em; color: #bfdbfe; margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .result-card.green { background: linear-gradient(135deg, #065f46, #047857); }
+  .result-card.red   { background: linear-gradient(135deg, #7f1d1d, #991b1b); }
+  .result-card.amber { background: linear-gradient(135deg, #78350f, #92400e); }
+
+  /* ── Pipeline diagram ── */
+  .pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 28px 0 36px;
+    font-size: 0.82em;
+  }
+  .pipe-step {
+    flex: 1;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 14px 10px;
+    text-align: center;
+    position: relative;
+  }
+  .pipe-step .num {
+    display: inline-block;
+    background: #1e40af;
+    color: #fff;
+    border-radius: 50%;
+    width: 24px; height: 24px;
+    line-height: 24px;
+    font-size: 0.85em;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .pipe-step .title { font-weight: 700; color: #0f172a; font-size: 0.95em; margin-bottom: 4px; }
+  .pipe-step .desc  { color: #475569; font-size: 0.88em; line-height: 1.4; }
+  .pipe-arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    color: #94a3b8;
+    font-size: 1.4em;
+    flex-shrink: 0;
+  }
+
+  /* ── Feature table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 28px;
+    font-size: 0.9em;
+  }
+  thead tr { background: #1e40af; color: #fff; }
+  thead th { padding: 10px 12px; text-align: left; font-weight: 600; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  tbody tr:hover { background: #eff6ff; }
+  td { padding: 9px 12px; border-bottom: 1px solid #e2e8f0; color: #334155; vertical-align: top; }
+  td:first-child { font-family: 'Courier New', monospace; font-size: 0.85em; color: #1e40af; font-weight: 600; white-space: nowrap; }
+
+  /* ── File sections ── */
+  .file-section {
+    margin-bottom: 40px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .file-header {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .file-header .filename {
+    font-family: 'Courier New', monospace;
+    font-size: 0.95em;
+    color: #93c5fd;
+    font-weight: 600;
+  }
+  .file-header .file-desc {
+    font-size: 0.82em;
+    color: #94a3b8;
+  }
+  .file-explanation {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 16px 20px;
+    font-size: 0.92em;
+    color: #334155;
+    line-height: 1.65;
+  }
+  .file-explanation strong { color: #1e3a5f; }
+
+  /* ── Code blocks ── */
+  pre {
+    margin: 0;
+    padding: 20px;
+    background: #0d1117;
+    overflow-x: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 8.5pt;
+    line-height: 1.55;
+  }
+  code { font-family: inherit; }
+
+  /* Syntax colouring (manual token classes) */
+  .kw  { color: #ff7b72; }   /* keywords */
+  .fn  { color: #d2a8ff; }   /* functions / class names */
+  .st  { color: #a5d6ff; }   /* strings */
+  .cm  { color: #8b949e; font-style: italic; }  /* comments */
+  .nm  { color: #79c0ff; }   /* numbers */
+  .df  { color: #ffa657; }   /* def / class keyword */
+  .bi  { color: #ffa657; }   /* builtins */
+  .op  { color: #c9d1d9; }   /* operators, punctuation */
+  .plain { color: #c9d1d9; } /* default text */
+
+  /* ── Ensemble weights ── */
+  .weights-row {
+    display: flex;
+    gap: 16px;
+    margin: 20px 0 28px;
+  }
+  .weight-card {
+    flex: 1;
+    border: 2px solid #1e40af;
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+  }
+  .weight-card .wval { font-size: 1.6em; font-weight: 700; color: #1e40af; }
+  .weight-card .wlbl { font-size: 0.82em; color: #64748b; margin-top: 4px; }
+
+  /* ── Info boxes ── */
+  .info-box {
+    background: #eff6ff;
+    border-left: 4px solid #1e40af;
+    border-radius: 0 8px 8px 0;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 0.92em;
+    color: #1e3a5f;
+  }
+
+  /* ── Print button ── */
+  .print-btn {
+    position: fixed;
+    top: 20px; right: 20px;
+    background: #1e40af;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 0.9em;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 999;
+  }
+  .print-btn:hover { background: #1d4ed8; }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">Print / Save PDF</button>
+
+<div class="page">
+
+  <!-- ══════════════════ COVER ══════════════════ -->
+  <div class="cover">
+    <h1>NetTrace</h1>
+    <div class="subtitle">Graph-Based Financial Fraud Detection System</div>
+    <div class="meta">
+      <div>Author: Aryan Kakkar</div>
+      <div style="margin-top:16px;">
+        <span class="badge">Python</span>
+        <span class="badge">PyTorch Geometric</span>
+        <span class="badge">GraphSAGE</span>
+        <span class="badge">NetworkX</span>
+        <span class="badge">Streamlit</span>
+        <span class="badge">Isolation Forest</span>
+        <span class="badge">Louvain Clustering</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ 1. PROJECT OVERVIEW ══════════════════ -->
+  <h2>1. Project Overview</h2>
+
+  <p>
+    <strong>NetTrace</strong> is a four-layer graph-based fraud detection system built on the PaySim
+    financial transaction dataset. Rather than scoring each transaction in isolation, NetTrace models
+    every account as a node and every transaction as a directed edge in a network. This graph
+    representation lets the system detect coordinated fraud patterns — such as chains of mule accounts
+    rapidly passing stolen funds — that are invisible to row-by-row classifiers.
+  </p>
+
+  <p>
+    The system combines three complementary detection signals into a single ensemble risk score per account:
+  </p>
+
+  <ul style="margin: 8px 0 14px 24px; color: #334155;">
+    <li style="margin-bottom:6px;"><strong>GraphSAGE (75%):</strong> A two-layer Graph Neural Network that learns fraud patterns from each account's own features and those of its network neighbours.</li>
+    <li style="margin-bottom:6px;"><strong>Louvain Community Detection (10%):</strong> Identifies tightly connected clusters of accounts and scores each cluster by its fraud concentration.</li>
+    <li style="margin-bottom:6px;"><strong>Isolation Forest (15%):</strong> Unsupervised anomaly detection that flags statistically unusual behavioural patterns without requiring fraud labels.</li>
+  </ul>
+
+  <p>
+    Accounts scoring above a configurable threshold (default 0.60) are flagged as high-risk.
+    The system is designed to prioritise <strong>precision</strong> — minimising false alarms — making
+    its output actionable for human investigators.
+  </p>
+
+  <!-- ══════════════════ 2. RESULTS ══════════════════ -->
+  <h2>2. Final Results</h2>
+
+  <div class="results-grid">
+    <div class="result-card">
+      <div class="val">0.9237</div>
+      <div class="lbl">AUC-ROC</div>
+    </div>
+    <div class="result-card green">
+      <div class="val">81.1%</div>
+      <div class="lbl">Precision</div>
+    </div>
+    <div class="result-card amber">
+      <div class="val">61.6%</div>
+      <div class="lbl">Recall</div>
+    </div>
+    <div class="result-card red">
+      <div class="val">10,074</div>
+      <div class="lbl">Fraud accounts found</div>
+    </div>
+  </div>
+
+  <div class="results-grid" style="grid-template-columns: repeat(3,1fr);">
+    <div class="result-card" style="background:linear-gradient(135deg,#1e3a5f,#1e40af);">
+      <div class="val">$9.8B</div>
+      <div class="lbl">Total at risk</div>
+    </div>
+    <div class="result-card" style="background:linear-gradient(135deg,#312e81,#4338ca);">
+      <div class="val">0.60</div>
+      <div class="lbl">Decision threshold</div>
+    </div>
+    <div class="result-card" style="background:linear-gradient(135deg,#134e4a,#0f766e);">
+      <div class="val">150</div>
+      <div class="lbl">Training epochs (max)</div>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <strong>Ensemble weights:</strong> GraphSAGE 75% &nbsp;·&nbsp; Community signal 10% &nbsp;·&nbsp; Isolation Forest 15%.
+    The high weight on GraphSAGE reflects that the GNN consistently provides the strongest individual signal.
+    The threshold was raised from 0.50 to 0.60 to improve precision at the cost of modest recall.
+  </div>
+
+  <!-- ══════════════════ 3. PIPELINE ══════════════════ -->
+  <h2>3. Pipeline Architecture</h2>
+
+  <div class="pipeline">
+    <div class="pipe-step">
+      <div class="num">1</div>
+      <div class="title">Data &amp; Features</div>
+      <div class="desc">Load PaySim CSV. Filter to TRANSFER &amp; CASH_OUT. Engineer 4 transaction-level features.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step">
+      <div class="num">2</div>
+      <div class="title">Graph Build</div>
+      <div class="desc">Stratified sample (20% fraud). Accounts → nodes. Transactions → directed edges.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step">
+      <div class="num">3</div>
+      <div class="title">Detection</div>
+      <div class="desc">GraphSAGE GNN + Louvain clustering + Isolation Forest → ensemble risk score.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step">
+      <div class="num">4</div>
+      <div class="title">Dashboard</div>
+      <div class="desc">Streamlit app showing flagged accounts, financial impact, model performance.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ 4. FEATURE TABLE ══════════════════ -->
+  <h2>4. Node Feature Table</h2>
+
+  <p>Each account node in the graph is described by seven features computed from its transaction history:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th>Plain-English Description</th>
+        <th>Why It Signals Fraud</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>in_degree</td>
+        <td>Number of accounts sending money <em>into</em> this account</td>
+        <td>Mule accounts often receive from many senders in a short window</td>
+      </tr>
+      <tr>
+        <td>out_degree</td>
+        <td>Number of accounts this account sends money <em>to</em></td>
+        <td>Fraud originators tend to send to many destinations quickly</td>
+      </tr>
+      <tr>
+        <td>degree_ratio</td>
+        <td>Ratio of outgoing connections to incoming connections</td>
+        <td>High ratio (&gt;1) means the account sends far more than it receives — a classic fraud pattern</td>
+      </tr>
+      <tr>
+        <td>avg_balance_drop</td>
+        <td>Average fraction of account balance drained per transaction, clipped to [0, 1]</td>
+        <td>Fraudsters typically drain accounts completely; legitimate senders rarely send 100% of balance</td>
+      </tr>
+      <tr>
+        <td>avg_amount_to_balance</td>
+        <td>Average remaining balance fraction after each transaction (newBalance / oldBalance)</td>
+        <td>Values near zero indicate the account is regularly emptied — a strong fraud signal</td>
+      </tr>
+      <tr>
+        <td>dest_empty_rate</td>
+        <td>Fraction of transactions sent to accounts with zero opening balance</td>
+        <td>Fraudsters frequently send to freshly created empty accounts to obscure trails</td>
+      </tr>
+      <tr>
+        <td>avg_dest_increase</td>
+        <td>Average change in the destination account's balance after receiving a transaction</td>
+        <td>Unusually large destination balance increases can indicate layering of stolen funds</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ══════════════════ 5. SOURCE FILES ══════════════════ -->
+  <h2>5. Source Code</h2>
+
+  <!-- ── Layer 1 ── -->
+  <div class="file-section">
+    <div class="file-header">
+      <span class="filename">src/layer1_ingestion.py</span>
+      <span class="file-desc">— Data loading, cleaning &amp; transaction-level feature engineering</span>
+    </div>
+    <div class="file-explanation">
+      <strong>What it does:</strong> Loads the raw PaySim CSV and filters it down to the two transaction
+      types where fraud actually occurs: <em>TRANSFER</em> and <em>CASH_OUT</em>. It then engineers four
+      transaction-level features using vectorised NumPy operations — avoiding slow row-wise <code>apply()</code>
+      calls. <code>balance_drop_ratio</code> measures how much of a sender's balance was sent;
+      <code>amount_to_balance_ratio</code> measures how much balance remains after the transfer;
+      <code>dest_was_empty</code> flags whether the destination account had zero balance before receiving;
+      and <code>dest_balance_increase</code> tracks the raw balance change at the destination.
+      These four signals feed into the node-level feature aggregation in Layer 3.
+    </div>
+<pre><code><span class="cm"># layer1_ingestion.py</span>
+
+<span class="kw">import</span> <span class="plain">pandas</span> <span class="kw">as</span> <span class="plain">pd</span>
+<span class="kw">import</span> <span class="plain">numpy</span> <span class="kw">as</span> <span class="plain">np</span>
+<span class="kw">import</span> <span class="plain">os</span>
+
+<span class="plain">FILEPATH</span> <span class="op">=</span> <span class="plain">os</span><span class="op">.</span><span class="plain">path</span><span class="op">.</span><span class="fn">join</span><span class="op">(</span><span class="plain">os</span><span class="op">.</span><span class="plain">path</span><span class="op">.</span><span class="fn">dirname</span><span class="op">(</span><span class="plain">os</span><span class="op">.</span><span class="plain">path</span><span class="op">.</span><span class="fn">abspath</span><span class="op">(</span><span class="plain">__file__</span><span class="op">)),</span> <span class="st">'..'</span><span class="op">,</span> <span class="st">'data'</span><span class="op">,</span> <span class="st">'transactions.csv'</span><span class="op">)</span>
+
+
+<span class="df">def</span> <span class="fn">load_data</span><span class="op">(</span><span class="plain">filepath</span><span class="op">=</span><span class="plain">FILEPATH</span><span class="op">):</span>
+    <span class="plain">df</span> <span class="op">=</span> <span class="plain">pd</span><span class="op">.</span><span class="fn">read_csv</span><span class="op">(</span><span class="plain">filepath</span><span class="op">)</span>
+    <span class="fn">print</span><span class="op">(</span><span class="st">f"Loaded </span><span class="op">{</span><span class="fn">len</span><span class="op">(</span><span class="plain">df</span><span class="op">)</span><span class="st">:,} transactions"</span><span class="op">)</span>
+    <span class="kw">return</span> <span class="plain">df</span>
+
+
+<span class="df">def</span> <span class="fn">clean_data</span><span class="op">(</span><span class="plain">df</span><span class="op">):</span>
+    <span class="plain">cols</span> <span class="op">=</span> <span class="op">[</span><span class="st">'step'</span><span class="op">,</span> <span class="st">'type'</span><span class="op">,</span> <span class="st">'amount'</span><span class="op">,</span> <span class="st">'nameOrig'</span><span class="op">,</span> <span class="st">'nameDest'</span><span class="op">,</span>
+            <span class="st">'oldbalanceOrg'</span><span class="op">,</span> <span class="st">'newbalanceOrig'</span><span class="op">,</span>
+            <span class="st">'oldbalanceDest'</span><span class="op">,</span> <span class="st">'newbalanceDest'</span><span class="op">,</span> <span class="st">'isFraud'</span><span class="op">]</span>
+    <span class="plain">df</span> <span class="op">=</span> <span class="plain">df</span><span class="op">[</span><span class="plain">cols</span><span class="op">].</span><span class="fn">copy</span><span class="op">()</span>
+    <span class="plain">df</span> <span class="op">=</span> <span class="plain">df</span><span class="op">[</span><span class="plain">df</span><span class="op">[</span><span class="st">'amount'</span><span class="op">]</span> <span class="op">&gt;</span> <span class="nm">0</span><span class="op">]</span>
+    <span class="plain">df</span> <span class="op">=</span> <span class="plain">df</span><span class="op">[</span><span class="plain">df</span><span class="op">[</span><span class="st">'type'</span><span class="op">].</span><span class="fn">isin</span><span class="op">([</span><span class="st">'TRANSFER'</span><span class="op">,</span> <span class="st">'CASH_OUT'</span><span class="op">])]</span>
+    <span class="fn">print</span><span class="op">(</span><span class="st">f"Cleaned: </span><span class="op">{</span><span class="fn">len</span><span class="op">(</span><span class="plain">df</span><span class="op">)</span><span class="st">:,} transactions remaining"</span><span class="op">)</span>
+    <span class="kw">return</span> <span class="plain">df</span>
+
+
+<span class="df">def</span> <span class="fn">engineer_features</span><span class="op">(</span><span class="plain">df</span><span class="op">):</span>
+    <span class="plain">df</span><span class="op">[</span><span class="st">'balance_drop_ratio'</span><span class="op">]</span> <span class="op">=</span> <span class="plain">np</span><span class="op">.</span><span class="fn">where</span><span class="op">(</span>
+        <span class="plain">df</span><span class="op">[</span><span class="st">'oldbalanceOrg'</span><span class="op">]</span> <span class="op">&gt;</span> <span class="nm">0</span><span class="op">,</span>
+        <span class="plain">df</span><span class="op">[</span><span class="st">'amount'</span><span class="op">]</span> <span class="op">/</span> <span class="plain">df</span><span class="op">[</span><span class="st">'oldbalanceOrg'</span><span class="op">],</span> <span class="nm">0</span>
+    <span class="op">).</span><span class="fn">clip</span><span class="op">(</span><span class="nm">0</span><span class="op">,</span> <span class="nm">1</span><span class="op">)</span>
+    <span class="plain">df</span><span class="op">[</span><span class="st">'dest_balance_increase'</span><span class="op">]</span> <span class="op">=</span> <span class="plain">df</span><span class="op">[</span><span class="st">'newbalanceDest'</span><span class="op">]</span> <span class="op">-</span> <span class="plain">df</span><span class="op">[</span><span class="st">'oldbalanceDest'</span><span class="op">]</span>
+    <span class="plain">df</span><span class="op">[</span><span class="st">'amount_to_balance_ratio'</span><span class="op">]</span> <span class="op">=</span> <span class="plain">np</span><span class="op">.</span><span class="fn">where</span><span class="op">(</span>
+        <span class="plain">df</span><span class="op">[</span><span class="st">'oldbalanceOrg'</span><span class="op">]</span> <span class="op">&gt;</span> <span class="nm">0</span><span class="op">,</span>
+        <span class="plain">df</span><span class="op">[</span><span class="st">'newbalanceOrig'</span><span class="op">]</span> <span class="op">/</span> <span class="plain">df</span><span class="op">[</span><span class="st">'oldbalanceOrg'</span><span class="op">],</span> <span class="nm">0</span>
+    <span class="op">).</span><span class="fn">clip</span><span class="op">(</span><span class="nm">0</span><span class="op">,</span> <span class="nm">1</span><span class="op">)</span>
+    <span class="plain">df</span><span class="op">[</span><span class="st">'dest_was_empty'</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span><span class="plain">df</span><span class="op">[</span><span class="st">'oldbalanceDest'</span><span class="op">]</span> <span class="op">==</span> <span class="nm">0</span><span class="op">).</span><span class="fn">astype</span><span class="op">(</span><span class="fn">int</span><span class="op">)</span>
+    <span class="kw">return</span> <span class="plain">df</span>
+</code></pre>
+  </div>
+
+  <!-- ── Layer 2 ── -->
+  <div class="file-section page-break">
+    <div class="file-header">
+      <span class="filename">src/layer2_graph.py</span>
+      <span class="file-desc">— Stratified sampling &amp; directed graph construction</span>
+    </div>
+    <div class="file-explanation">
+      <strong>What it does:</strong> Converts the flat transaction table into a directed graph using
+      NetworkX. Each unique account becomes a node; each transaction becomes a directed edge weighted
+      by amount. The stratified sampler inflates fraud to 20% of the working sample — necessary
+      because PaySim's raw fraud rate is under 0.1%, which would make training impractical.
+      A critical design decision is that <em>both</em> the sender and the receiver of a fraudulent
+      transaction are labelled as fraud nodes. PaySim's ground truth only labels the sender, but the
+      receiver is a mule account that is equally part of the fraud network. This bilateral labelling
+      is what allows GraphSAGE to learn from the full fraud subgraph rather than just half of it.
+    </div>
+<pre><code><span class="cm"># layer2_graph.py</span>
+
+<span class="kw">import</span> <span class="plain">pandas</span> <span class="kw">as</span> <span class="plain">pd</span>
+<span class="kw">import</span> <span class="plain">networkx</span> <span class="kw">as</span> <span class="plain">nx</span>
+
+<span class="df">def</span> <span class="fn">stratified_sample</span><span class="op">(</span><span class="plain">df</span><span class="op">,</span> <span class="plain">fraud_ratio</span><span class="op">=</span><span class="nm">0.2</span><span class="op">,</span> <span class="plain">max_size</span><span class="op">=</span><span class="nm">50000</span><span class="op">):</span>
+    <span class="cm">"""Inflate fraud to 20% so the GNN has enough signal to learn from."""</span>
+    <span class="plain">fraud</span>   <span class="op">=</span> <span class="plain">df</span><span class="op">[</span><span class="plain">df</span><span class="op">[</span><span class="st">'isFraud'</span><span class="op">]</span> <span class="op">==</span> <span class="nm">1</span><span class="op">]</span>
+    <span class="plain">clean</span>   <span class="op">=</span> <span class="plain">df</span><span class="op">[</span><span class="plain">df</span><span class="op">[</span><span class="st">'isFraud'</span><span class="op">]</span> <span class="op">==</span> <span class="nm">0</span><span class="op">]</span>
+    <span class="plain">n_fraud</span> <span class="op">=</span> <span class="fn">len</span><span class="op">(</span><span class="plain">fraud</span><span class="op">)</span>
+    <span class="plain">n_clean</span> <span class="op">=</span> <span class="fn">int</span><span class="op">(</span><span class="plain">n_fraud</span> <span class="op">*</span> <span class="op">((</span><span class="nm">1</span> <span class="op">-</span> <span class="plain">fraud_ratio</span><span class="op">)</span> <span class="op">/</span> <span class="plain">fraud_ratio</span><span class="op">))</span>
+    <span class="plain">total</span>   <span class="op">=</span> <span class="plain">n_fraud</span> <span class="op">+</span> <span class="plain">n_clean</span>
+    <span class="kw">if</span> <span class="plain">total</span> <span class="op">&gt;</span> <span class="plain">max_size</span><span class="op">:</span>
+        <span class="plain">scale</span>   <span class="op">=</span> <span class="plain">max_size</span> <span class="op">/</span> <span class="plain">total</span>
+        <span class="plain">n_fraud</span> <span class="op">=</span> <span class="fn">int</span><span class="op">(</span><span class="plain">n_fraud</span> <span class="op">*</span> <span class="plain">scale</span><span class="op">)</span>
+        <span class="plain">n_clean</span> <span class="op">=</span> <span class="fn">int</span><span class="op">(</span><span class="plain">n_clean</span> <span class="op">*</span> <span class="plain">scale</span><span class="op">)</span>
+    <span class="kw">return</span> <span class="plain">pd</span><span class="op">.</span><span class="fn">concat</span><span class="op">([</span>
+        <span class="plain">fraud</span><span class="op">.</span><span class="fn">sample</span><span class="op">(</span><span class="plain">n</span><span class="op">=</span><span class="plain">n_fraud</span><span class="op">,</span> <span class="plain">random_state</span><span class="op">=</span><span class="nm">42</span><span class="op">),</span>
+        <span class="plain">clean</span><span class="op">.</span><span class="fn">sample</span><span class="op">(</span><span class="plain">n</span><span class="op">=</span><span class="plain">n_clean</span><span class="op">,</span> <span class="plain">random_state</span><span class="op">=</span><span class="nm">42</span><span class="op">)</span>
+    <span class="op">]).</span><span class="fn">reset_index</span><span class="op">(</span><span class="plain">drop</span><span class="op">=</span><span class="kw">True</span><span class="op">)</span>
+
+
+<span class="df">def</span> <span class="fn">build_graph</span><span class="op">(</span><span class="plain">df</span><span class="op">):</span>
+    <span class="cm">"""Build directed graph; label both sender AND receiver as fraud."""</span>
+    <span class="plain">G</span> <span class="op">=</span> <span class="plain">nx</span><span class="op">.</span><span class="fn">DiGraph</span><span class="op">()</span>
+    <span class="kw">for</span> <span class="plain">_</span><span class="op">,</span> <span class="plain">row</span> <span class="kw">in</span> <span class="plain">df</span><span class="op">.</span><span class="fn">iterrows</span><span class="op">():</span>
+        <span class="plain">sender</span><span class="op">,</span> <span class="plain">receiver</span> <span class="op">=</span> <span class="plain">row</span><span class="op">[</span><span class="st">'nameOrig'</span><span class="op">],</span> <span class="plain">row</span><span class="op">[</span><span class="st">'nameDest'</span><span class="op">]</span>
+        <span class="plain">is_fraud</span> <span class="op">=</span> <span class="fn">int</span><span class="op">(</span><span class="plain">row</span><span class="op">[</span><span class="st">'isFraud'</span><span class="op">])</span>
+        <span class="kw">if</span> <span class="plain">G</span><span class="op">.</span><span class="fn">has_edge</span><span class="op">(</span><span class="plain">sender</span><span class="op">,</span> <span class="plain">receiver</span><span class="op">):</span>
+            <span class="plain">G</span><span class="op">[</span><span class="plain">sender</span><span class="op">][</span><span class="plain">receiver</span><span class="op">][</span><span class="st">'weight'</span><span class="op">]</span> <span class="op">+=</span> <span class="plain">row</span><span class="op">[</span><span class="st">'amount'</span><span class="op">]</span>
+        <span class="kw">else</span><span class="op">:</span>
+            <span class="plain">G</span><span class="op">.</span><span class="fn">add_edge</span><span class="op">(</span><span class="plain">sender</span><span class="op">,</span> <span class="plain">receiver</span><span class="op">,</span> <span class="plain">weight</span><span class="op">=</span><span class="plain">row</span><span class="op">[</span><span class="st">'amount'</span><span class="op">])</span>
+        <span class="cm"># Label both accounts — receiver is a mule, not just the sender</span>
+        <span class="kw">for</span> <span class="plain">acct</span> <span class="kw">in</span> <span class="op">[</span><span class="plain">sender</span><span class="op">,</span> <span class="plain">receiver</span><span class="op">]:</span>
+            <span class="kw">if</span> <span class="plain">acct</span> <span class="kw">not in</span> <span class="plain">G</span><span class="op">.</span><span class="plain">nodes</span><span class="op">:</span>
+                <span class="plain">G</span><span class="op">.</span><span class="fn">add_node</span><span class="op">(</span><span class="plain">acct</span><span class="op">,</span> <span class="plain">is_fraud</span><span class="op">=</span><span class="plain">is_fraud</span><span class="op">)</span>
+            <span class="kw">else</span><span class="op">:</span>
+                <span class="plain">G</span><span class="op">.</span><span class="plain">nodes</span><span class="op">[</span><span class="plain">acct</span><span class="op">][</span><span class="st">'is_fraud'</span><span class="op">]</span> <span class="op">=</span> <span class="fn">max</span><span class="op">(</span>
+                    <span class="plain">G</span><span class="op">.</span><span class="plain">nodes</span><span class="op">[</span><span class="plain">acct</span><span class="op">].</span><span class="fn">get</span><span class="op">(</span><span class="st">'is_fraud'</span><span class="op">,</span> <span class="nm">0</span><span class="op">),</span> <span class="plain">is_fraud</span>
+                <span class="op">)</span>
+    <span class="kw">return</span> <span class="plain">G</span>
+</code></pre>
+  </div>
+
+  <!-- ── Utils ── -->
+  <div class="file-section page-break">
+    <div class="file-header">
+      <span class="filename">src/utils.py</span>
+      <span class="file-desc">— Shared model architecture, feature engineering &amp; detection utilities</span>
+    </div>
+    <div class="file-explanation">
+      <strong>What it does:</strong> Houses all shared logic used by both the detection pipeline
+      (<code>layer3_detection.py</code>) and the export runner (<code>export_results.py</code>).
+      Contains five components: (1) the <strong>GraphSAGE</strong> model class — a two-layer graph
+      neural network with ReLU activation and 30% dropout; (2) <strong>engineer_node_features()</strong>
+      — aggregates transaction-level features per account into node-level statistics;
+      (3) <strong>build_pyg_data()</strong> — converts the NetworkX graph into a PyTorch Geometric
+      <code>Data</code> object with a stratified 80/20 train/test split;
+      (4) <strong>run_clustering()</strong> — applies Louvain community detection and scores each
+      cluster by fraud concentration; (5) <strong>run_isolation_forest()</strong> — fits an
+      Isolation Forest with contamination=0.05 to flag statistically anomalous accounts.
+    </div>
+<pre><code><span class="cm"># utils.py</span>
+
+<span class="kw">import</span> <span class="plain">numpy</span> <span class="kw">as</span> <span class="plain">np</span>
+<span class="kw">import</span> <span class="plain">torch</span>
+<span class="kw">import</span> <span class="plain">torch.nn.functional</span> <span class="kw">as</span> <span class="plain">F</span>
+<span class="kw">from</span> <span class="plain">sklearn.ensemble</span> <span class="kw">import</span> <span class="plain">IsolationForest</span>
+<span class="kw">from</span> <span class="plain">sklearn.preprocessing</span> <span class="kw">import</span> <span class="plain">StandardScaler</span>
+<span class="kw">from</span> <span class="plain">sklearn.model_selection</span> <span class="kw">import</span> <span class="plain">train_test_split</span>
+<span class="kw">from</span> <span class="plain">community</span> <span class="kw">import</span> <span class="plain">best_partition</span>
+<span class="kw">from</span> <span class="plain">torch_geometric.data</span> <span class="kw">import</span> <span class="plain">Data</span>
+<span class="kw">from</span> <span class="plain">torch_geometric.nn</span> <span class="kw">import</span> <span class="plain">SAGEConv</span>
+<span class="kw">import</span> <span class="plain">pandas</span> <span class="kw">as</span> <span class="plain">pd</span>
+
+
+<span class="df">class</span> <span class="fn">GraphSAGE</span><span class="op">(</span><span class="plain">torch</span><span class="op">.</span><span class="plain">nn</span><span class="op">.</span><span class="plain">Module</span><span class="op">):</span>
+    <span class="df">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="plain">self</span><span class="op">,</span> <span class="plain">in_channels</span><span class="op">,</span> <span class="plain">hidden_channels</span><span class="op">,</span> <span class="plain">out_channels</span><span class="op">):</span>
+        <span class="fn">super</span><span class="op">().</span><span class="fn">__init__</span><span class="op">()</span>
+        <span class="plain">self</span><span class="op">.</span><span class="plain">conv1</span> <span class="op">=</span> <span class="fn">SAGEConv</span><span class="op">(</span><span class="plain">in_channels</span><span class="op">,</span> <span class="plain">hidden_channels</span><span class="op">)</span>
+        <span class="plain">self</span><span class="op">.</span><span class="plain">conv2</span> <span class="op">=</span> <span class="fn">SAGEConv</span><span class="op">(</span><span class="plain">hidden_channels</span><span class="op">,</span> <span class="plain">out_channels</span><span class="op">)</span>
+
+    <span class="df">def</span> <span class="fn">forward</span><span class="op">(</span><span class="plain">self</span><span class="op">,</span> <span class="plain">x</span><span class="op">,</span> <span class="plain">edge_index</span><span class="op">):</span>
+        <span class="plain">x</span> <span class="op">=</span> <span class="plain">self</span><span class="op">.</span><span class="plain">conv1</span><span class="op">(</span><span class="plain">x</span><span class="op">,</span> <span class="plain">edge_index</span><span class="op">)</span>
+        <span class="plain">x</span> <span class="op">=</span> <span class="plain">F</span><span class="op">.</span><span class="fn">relu</span><span class="op">(</span><span class="plain">x</span><span class="op">)</span>
+        <span class="plain">x</span> <span class="op">=</span> <span class="plain">F</span><span class="op">.</span><span class="fn">dropout</span><span class="op">(</span><span class="plain">x</span><span class="op">,</span> <span class="plain">p</span><span class="op">=</span><span class="nm">0.3</span><span class="op">,</span> <span class="plain">training</span><span class="op">=</span><span class="plain">self</span><span class="op">.</span><span class="plain">training</span><span class="op">)</span>
+        <span class="plain">x</span> <span class="op">=</span> <span class="plain">self</span><span class="op">.</span><span class="plain">conv2</span><span class="op">(</span><span class="plain">x</span><span class="op">,</span> <span class="plain">edge_index</span><span class="op">)</span>
+        <span class="kw">return</span> <span class="plain">F</span><span class="op">.</span><span class="fn">log_softmax</span><span class="op">(</span><span class="plain">x</span><span class="op">,</span> <span class="plain">dim</span><span class="op">=</span><span class="nm">1</span><span class="op">)</span>
+
+
+<span class="df">def</span> <span class="fn">engineer_node_features</span><span class="op">(</span><span class="plain">G</span><span class="op">,</span> <span class="plain">df</span><span class="op">):</span>
+    <span class="plain">account_stats</span> <span class="op">=</span> <span class="op">{}</span>
+    <span class="kw">for</span> <span class="plain">_</span><span class="op">,</span> <span class="plain">row</span> <span class="kw">in</span> <span class="plain">df</span><span class="op">.</span><span class="fn">iterrows</span><span class="op">():</span>
+        <span class="kw">for</span> <span class="plain">acct</span> <span class="kw">in</span> <span class="op">[</span><span class="plain">row</span><span class="op">[</span><span class="st">'nameOrig'</span><span class="op">],</span> <span class="plain">row</span><span class="op">[</span><span class="st">'nameDest'</span><span class="op">]]:</span>
+            <span class="kw">if</span> <span class="plain">acct</span> <span class="kw">not in</span> <span class="plain">account_stats</span><span class="op">:</span>
+                <span class="plain">account_stats</span><span class="op">[</span><span class="plain">acct</span><span class="op">]</span> <span class="op">=</span> <span class="op">{</span>
+                    <span class="st">'balance_drops'</span><span class="op">:</span> <span class="op">[],</span> <span class="st">'amount_to_balance'</span><span class="op">:</span> <span class="op">[],</span>
+                    <span class="st">'dest_empty'</span><span class="op">:</span> <span class="op">[],</span> <span class="st">'dest_increases'</span><span class="op">:</span> <span class="op">[]</span>
+                <span class="op">}</span>
+        <span class="plain">s</span> <span class="op">=</span> <span class="plain">row</span><span class="op">[</span><span class="st">'nameOrig'</span><span class="op">]</span>
+        <span class="plain">account_stats</span><span class="op">[</span><span class="plain">s</span><span class="op">][</span><span class="st">'balance_drops'</span><span class="op">].</span><span class="fn">append</span><span class="op">(</span><span class="plain">row</span><span class="op">[</span><span class="st">'balance_drop_ratio'</span><span class="op">])</span>
+        <span class="plain">account_stats</span><span class="op">[</span><span class="plain">s</span><span class="op">][</span><span class="st">'amount_to_balance'</span><span class="op">].</span><span class="fn">append</span><span class="op">(</span><span class="plain">row</span><span class="op">[</span><span class="st">'amount_to_balance_ratio'</span><span class="op">])</span>
+        <span class="plain">account_stats</span><span class="op">[</span><span class="plain">s</span><span class="op">][</span><span class="st">'dest_empty'</span><span class="op">].</span><span class="fn">append</span><span class="op">(</span><span class="plain">row</span><span class="op">[</span><span class="st">'dest_was_empty'</span><span class="op">])</span>
+        <span class="plain">account_stats</span><span class="op">[</span><span class="plain">s</span><span class="op">][</span><span class="st">'dest_increases'</span><span class="op">].</span><span class="fn">append</span><span class="op">(</span><span class="plain">row</span><span class="op">[</span><span class="st">'dest_balance_increase'</span><span class="op">])</span>
+    <span class="plain">rows</span> <span class="op">=</span> <span class="op">[]</span>
+    <span class="plain">seen</span> <span class="op">=</span> <span class="fn">set</span><span class="op">()</span>
+    <span class="kw">for</span> <span class="plain">node</span> <span class="kw">in</span> <span class="plain">G</span><span class="op">.</span><span class="fn">nodes</span><span class="op">():</span>
+        <span class="kw">if</span> <span class="plain">node</span> <span class="kw">in</span> <span class="plain">seen</span><span class="op">:</span> <span class="kw">continue</span>
+        <span class="plain">seen</span><span class="op">.</span><span class="fn">add</span><span class="op">(</span><span class="plain">node</span><span class="op">)</span>
+        <span class="plain">in_deg</span>  <span class="op">=</span> <span class="plain">G</span><span class="op">.</span><span class="fn">in_degree</span><span class="op">(</span><span class="plain">node</span><span class="op">)</span>
+        <span class="plain">out_deg</span> <span class="op">=</span> <span class="plain">G</span><span class="op">.</span><span class="fn">out_degree</span><span class="op">(</span><span class="plain">node</span><span class="op">)</span>
+        <span class="plain">stats</span>   <span class="op">=</span> <span class="plain">account_stats</span><span class="op">.</span><span class="fn">get</span><span class="op">(</span><span class="plain">node</span><span class="op">)</span>
+        <span class="plain">degree_ratio</span> <span class="op">=</span> <span class="plain">out_deg</span> <span class="op">/</span> <span class="plain">in_deg</span> <span class="kw">if</span> <span class="plain">in_deg</span> <span class="op">&gt;</span> <span class="nm">0</span> <span class="kw">else</span> <span class="fn">float</span><span class="op">(</span><span class="plain">out_deg</span><span class="op">)</span>
+        <span class="plain">rows</span><span class="op">.</span><span class="fn">append</span><span class="op">({</span>
+            <span class="st">'node'</span><span class="op">:</span> <span class="plain">node</span><span class="op">,</span> <span class="st">'in_degree'</span><span class="op">:</span> <span class="plain">in_deg</span><span class="op">,</span> <span class="st">'out_degree'</span><span class="op">:</span> <span class="plain">out_deg</span><span class="op">,</span>
+            <span class="st">'degree_ratio'</span><span class="op">:</span> <span class="fn">round</span><span class="op">(</span><span class="plain">degree_ratio</span><span class="op">,</span> <span class="nm">4</span><span class="op">),</span>
+            <span class="cm"># ... other feature averages from account_stats ...</span>
+            <span class="st">'is_fraud'</span><span class="op">:</span> <span class="plain">G</span><span class="op">.</span><span class="plain">nodes</span><span class="op">[</span><span class="plain">node</span><span class="op">].</span><span class="fn">get</span><span class="op">(</span><span class="st">'is_fraud'</span><span class="op">,</span> <span class="nm">0</span><span class="op">)</span>
+        <span class="op">})</span>
+    <span class="kw">return</span> <span class="plain">pd</span><span class="op">.</span><span class="fn">DataFrame</span><span class="op">(</span><span class="plain">rows</span><span class="op">)</span>
+
+
+<span class="df">def</span> <span class="fn">run_clustering</span><span class="op">(</span><span class="plain">G</span><span class="op">,</span> <span class="plain">features_df</span><span class="op">):</span>
+    <span class="plain">partition</span> <span class="op">=</span> <span class="fn">best_partition</span><span class="op">(</span><span class="plain">G</span><span class="op">.</span><span class="fn">to_undirected</span><span class="op">(),</span> <span class="plain">randomize</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>
+    <span class="plain">features_df</span> <span class="op">=</span> <span class="plain">features_df</span><span class="op">.</span><span class="fn">copy</span><span class="op">()</span>
+    <span class="plain">features_df</span><span class="op">[</span><span class="st">'community'</span><span class="op">]</span> <span class="op">=</span> <span class="plain">features_df</span><span class="op">[</span><span class="st">'node'</span><span class="op">].</span><span class="fn">map</span><span class="op">(</span><span class="plain">partition</span><span class="op">)</span>
+    <span class="plain">cs</span> <span class="op">=</span> <span class="op">(</span><span class="plain">features_df</span><span class="op">.</span><span class="fn">groupby</span><span class="op">(</span><span class="st">'community'</span><span class="op">)[</span><span class="st">'is_fraud'</span><span class="op">]</span>
+          <span class="op">.</span><span class="fn">agg</span><span class="op">([</span><span class="st">'mean'</span><span class="op">,</span> <span class="st">'count'</span><span class="op">]).</span><span class="fn">reset_index</span><span class="op">())</span>
+    <span class="plain">cs</span><span class="op">.</span><span class="plain">columns</span> <span class="op">=</span> <span class="op">[</span><span class="st">'community'</span><span class="op">,</span> <span class="st">'fraud_rate'</span><span class="op">,</span> <span class="st">'size'</span><span class="op">]</span>
+    <span class="plain">cs</span> <span class="op">=</span> <span class="plain">cs</span><span class="op">[</span><span class="plain">cs</span><span class="op">[</span><span class="st">'size'</span><span class="op">]</span> <span class="op">&gt;=</span> <span class="nm">5</span><span class="op">].</span><span class="fn">sort_values</span><span class="op">(</span><span class="st">'fraud_rate'</span><span class="op">,</span> <span class="plain">ascending</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>
+    <span class="kw">return</span> <span class="plain">features_df</span><span class="op">,</span> <span class="plain">cs</span>
+
+
+<span class="df">def</span> <span class="fn">run_isolation_forest</span><span class="op">(</span><span class="plain">features_df</span><span class="op">):</span>
+    <span class="plain">X</span> <span class="op">=</span> <span class="fn">StandardScaler</span><span class="op">().</span><span class="fn">fit_transform</span><span class="op">(</span><span class="plain">features_df</span><span class="op">[</span><span class="plain">feature_cols</span><span class="op">])</span>
+    <span class="plain">raw</span> <span class="op">=</span> <span class="fn">IsolationForest</span><span class="op">(</span><span class="plain">contamination</span><span class="op">=</span><span class="nm">0.05</span><span class="op">,</span> <span class="plain">random_state</span><span class="op">=</span><span class="nm">42</span><span class="op">).</span><span class="fn">fit_predict</span><span class="op">(</span><span class="plain">X</span><span class="op">)</span>
+    <span class="plain">features_df</span> <span class="op">=</span> <span class="plain">features_df</span><span class="op">.</span><span class="fn">copy</span><span class="op">()</span>
+    <span class="plain">features_df</span><span class="op">[</span><span class="st">'anomaly_signal'</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span><span class="plain">raw</span> <span class="op">==</span> <span class="op">-</span><span class="nm">1</span><span class="op">).</span><span class="fn">astype</span><span class="op">(</span><span class="fn">int</span><span class="op">)</span>
+    <span class="kw">return</span> <span class="plain">features_df</span>
+</code></pre>
+  </div>
+
+  <!-- ── Export ── -->
+  <div class="file-section page-break">
+    <div class="file-header">
+      <span class="filename">src/export_results.py</span>
+      <span class="file-desc">— Full pipeline runner: trains, scores, and exports results.pkl</span>
+    </div>
+    <div class="file-explanation">
+      <strong>What it does:</strong> The main pipeline entry point. Orchestrates all four layers:
+      loads and cleans data, builds the graph, engineers node features, runs all three detection
+      models, computes the ensemble score, and serialises everything to <code>data/results.pkl</code>
+      for the dashboard to consume. Key design choices include:
+      <strong>early stopping</strong> with patience=30 and a minimum improvement delta of 0.0001
+      to avoid stopping on AUC fluctuations; a <strong>decision threshold of 0.60</strong>
+      (raised from 0.50) to improve precision; and <strong>ensemble weights</strong> of
+      GraphSAGE 75%, Community 10%, Isolation Forest 15%.
+    </div>
+<pre><code><span class="cm"># export_results.py — key sections shown</span>
+
+<span class="df">def</span> <span class="fn">run_graphsage</span><span class="op">(</span><span class="plain">features_df</span><span class="op">,</span> <span class="plain">G</span><span class="op">,</span> <span class="plain">epochs</span><span class="op">=</span><span class="nm">150</span><span class="op">):</span>
+    <span class="plain">data</span><span class="op">,</span> <span class="plain">_</span><span class="op">,</span> <span class="plain">_</span> <span class="op">=</span> <span class="fn">build_pyg_data</span><span class="op">(</span><span class="plain">G</span><span class="op">,</span> <span class="plain">features_df</span><span class="op">)</span>
+    <span class="plain">n_clean</span> <span class="op">=</span> <span class="op">(</span><span class="plain">features_df</span><span class="op">[</span><span class="st">'is_fraud'</span><span class="op">]</span> <span class="op">==</span> <span class="nm">0</span><span class="op">).</span><span class="fn">sum</span><span class="op">()</span>
+    <span class="plain">n_fraud</span> <span class="op">=</span> <span class="op">(</span><span class="plain">features_df</span><span class="op">[</span><span class="st">'is_fraud'</span><span class="op">]</span> <span class="op">==</span> <span class="nm">1</span><span class="op">).</span><span class="fn">sum</span><span class="op">()</span>
+    <span class="plain">weight</span>  <span class="op">=</span> <span class="plain">torch</span><span class="op">.</span><span class="fn">tensor</span><span class="op">([</span><span class="nm">1.0</span><span class="op">,</span> <span class="plain">n_clean</span> <span class="op">/</span> <span class="plain">n_fraud</span><span class="op">],</span> <span class="plain">dtype</span><span class="op">=</span><span class="plain">torch</span><span class="op">.</span><span class="plain">float</span><span class="op">)</span>
+    <span class="plain">model</span>     <span class="op">=</span> <span class="fn">GraphSAGE</span><span class="op">(</span><span class="plain">data</span><span class="op">.</span><span class="plain">num_node_features</span><span class="op">,</span> <span class="nm">64</span><span class="op">,</span> <span class="nm">2</span><span class="op">)</span>
+    <span class="plain">optimizer</span> <span class="op">=</span> <span class="plain">torch</span><span class="op">.</span><span class="plain">optim</span><span class="op">.</span><span class="fn">Adam</span><span class="op">(</span><span class="plain">model</span><span class="op">.</span><span class="fn">parameters</span><span class="op">(),</span> <span class="plain">lr</span><span class="op">=</span><span class="nm">0.01</span><span class="op">,</span> <span class="plain">weight_decay</span><span class="op">=</span><span class="nm">5e-4</span><span class="op">)</span>
+    <span class="plain">criterion</span> <span class="op">=</span> <span class="plain">torch</span><span class="op">.</span><span class="plain">nn</span><span class="op">.</span><span class="fn">NLLLoss</span><span class="op">(</span><span class="plain">weight</span><span class="op">=</span><span class="plain">weight</span><span class="op">)</span>
+    <span class="plain">best_auc</span><span class="op">,</span> <span class="plain">best_weights</span> <span class="op">=</span> <span class="nm">0.0</span><span class="op">,</span> <span class="kw">None</span>
+    <span class="plain">patience</span><span class="op">,</span> <span class="plain">min_delta</span><span class="op">,</span> <span class="plain">epochs_no_improve</span> <span class="op">=</span> <span class="nm">30</span><span class="op">,</span> <span class="nm">1e-4</span><span class="op">,</span> <span class="nm">0</span>
+    <span class="kw">for</span> <span class="plain">epoch</span> <span class="kw">in</span> <span class="fn">range</span><span class="op">(</span><span class="plain">epochs</span><span class="op">):</span>
+        <span class="plain">model</span><span class="op">.</span><span class="fn">train</span><span class="op">()</span>
+        <span class="plain">optimizer</span><span class="op">.</span><span class="fn">zero_grad</span><span class="op">()</span>
+        <span class="plain">out</span>  <span class="op">=</span> <span class="plain">model</span><span class="op">(</span><span class="plain">data</span><span class="op">.</span><span class="plain">x</span><span class="op">,</span> <span class="plain">data</span><span class="op">.</span><span class="plain">edge_index</span><span class="op">)</span>
+        <span class="plain">loss</span> <span class="op">=</span> <span class="plain">criterion</span><span class="op">(</span><span class="plain">out</span><span class="op">[</span><span class="plain">data</span><span class="op">.</span><span class="plain">train_mask</span><span class="op">],</span> <span class="plain">data</span><span class="op">.</span><span class="plain">y</span><span class="op">[</span><span class="plain">data</span><span class="op">.</span><span class="plain">train_mask</span><span class="op">])</span>
+        <span class="plain">loss</span><span class="op">.</span><span class="fn">backward</span><span class="op">()</span>
+        <span class="plain">optimizer</span><span class="op">.</span><span class="fn">step</span><span class="op">()</span>
+        <span class="cm"># Early stopping: only reset if AUC improves by > min_delta</span>
+        <span class="plain">val_auc</span> <span class="op">=</span> <span class="fn">roc_auc_score</span><span class="op">(</span><span class="plain">y_val</span><span class="op">,</span> <span class="plain">val_probs_test</span><span class="op">)</span>
+        <span class="kw">if</span> <span class="plain">val_auc</span> <span class="op">&gt;</span> <span class="plain">best_auc</span> <span class="op">+</span> <span class="plain">min_delta</span><span class="op">:</span>
+            <span class="plain">best_auc</span>          <span class="op">=</span> <span class="plain">val_auc</span>
+            <span class="plain">best_weights</span>      <span class="op">=</span> <span class="op">{</span><span class="plain">k</span><span class="op">:</span> <span class="plain">v</span><span class="op">.</span><span class="fn">clone</span><span class="op">()</span> <span class="kw">for</span> <span class="plain">k</span><span class="op">,</span> <span class="plain">v</span> <span class="kw">in</span> <span class="plain">model</span><span class="op">.</span><span class="fn">state_dict</span><span class="op">().</span><span class="fn">items</span><span class="op">()}</span>
+            <span class="plain">epochs_no_improve</span> <span class="op">=</span> <span class="nm">0</span>
+        <span class="kw">else</span><span class="op">:</span>
+            <span class="plain">epochs_no_improve</span> <span class="op">+=</span> <span class="nm">1</span>
+        <span class="kw">if</span> <span class="plain">epochs_no_improve</span> <span class="op">&gt;=</span> <span class="plain">patience</span><span class="op">:</span>
+            <span class="kw">break</span>
+    <span class="plain">model</span><span class="op">.</span><span class="fn">load_state_dict</span><span class="op">(</span><span class="plain">best_weights</span><span class="op">)</span>   <span class="cm"># restore best checkpoint</span>
+    <span class="op">...</span>
+
+
+<span class="df">def</span> <span class="fn">compute_ensemble</span><span class="op">(</span><span class="plain">features_df</span><span class="op">,</span> <span class="plain">threshold</span><span class="op">=</span><span class="nm">0.5</span><span class="op">):</span>
+    <span class="plain">features_df</span><span class="op">[</span><span class="st">'ensemble_score'</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span>
+        <span class="nm">0.75</span> <span class="op">*</span> <span class="plain">features_df</span><span class="op">[</span><span class="st">'graphsage_probability'</span><span class="op">]</span> <span class="op">+</span>
+        <span class="nm">0.10</span> <span class="op">*</span> <span class="plain">features_df</span><span class="op">[</span><span class="st">'community_signal'</span><span class="op">]</span>      <span class="op">+</span>
+        <span class="nm">0.15</span> <span class="op">*</span> <span class="plain">features_df</span><span class="op">[</span><span class="st">'anomaly_signal'</span><span class="op">]</span>
+    <span class="op">)</span>
+    <span class="plain">flagged</span>   <span class="op">=</span> <span class="plain">features_df</span><span class="op">[</span><span class="plain">features_df</span><span class="op">[</span><span class="st">'ensemble_score'</span><span class="op">]</span> <span class="op">&gt;</span> <span class="plain">threshold</span><span class="op">].</span><span class="fn">copy</span><span class="op">()</span>
+    <span class="plain">confirmed</span> <span class="op">=</span> <span class="plain">flagged</span><span class="op">[</span><span class="plain">flagged</span><span class="op">[</span><span class="st">'is_fraud'</span><span class="op">]</span> <span class="op">==</span> <span class="nm">1</span><span class="op">]</span>
+    <span class="plain">precision</span> <span class="op">=</span> <span class="fn">len</span><span class="op">(</span><span class="plain">confirmed</span><span class="op">)</span> <span class="op">/</span> <span class="fn">len</span><span class="op">(</span><span class="plain">flagged</span><span class="op">)</span>
+    <span class="plain">recall</span>    <span class="op">=</span> <span class="fn">len</span><span class="op">(</span><span class="plain">confirmed</span><span class="op">)</span> <span class="op">/</span> <span class="plain">total_fraud</span>
+    <span class="kw">return</span> <span class="plain">features_df</span><span class="op">.</span><span class="fn">sort_values</span><span class="op">(</span><span class="st">'ensemble_score'</span><span class="op">,</span> <span class="plain">ascending</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span><span class="op">,</span> <span class="plain">flagged</span><span class="op">,</span> <span class="plain">precision</span><span class="op">,</span> <span class="plain">recall</span>
+
+
+<span class="cm"># Main block</span>
+<span class="kw">if</span> <span class="plain">__name__</span> <span class="op">==</span> <span class="st">"__main__"</span><span class="op">:</span>
+    <span class="plain">df</span>          <span class="op">=</span> <span class="fn">engineer_features</span><span class="op">(</span><span class="fn">clean_data</span><span class="op">(</span><span class="fn">load_data</span><span class="op">()))</span>
+    <span class="plain">sample</span>      <span class="op">=</span> <span class="fn">stratified_sample</span><span class="op">(</span><span class="plain">df</span><span class="op">,</span> <span class="plain">fraud_ratio</span><span class="op">=</span><span class="nm">0.2</span><span class="op">,</span> <span class="plain">max_size</span><span class="op">=</span><span class="nm">50000</span><span class="op">)</span>
+    <span class="plain">G</span>           <span class="op">=</span> <span class="fn">build_graph</span><span class="op">(</span><span class="plain">sample</span><span class="op">)</span>
+    <span class="plain">features_df</span> <span class="op">=</span> <span class="fn">engineer_node_features</span><span class="op">(</span><span class="plain">G</span><span class="op">,</span> <span class="plain">sample</span><span class="op">)</span>
+    <span class="plain">features_df</span><span class="op">,</span> <span class="plain">community_scores</span> <span class="op">=</span> <span class="fn">run_clustering</span><span class="op">(</span><span class="plain">G</span><span class="op">,</span> <span class="plain">features_df</span><span class="op">)</span>
+    <span class="plain">features_df</span> <span class="op">=</span> <span class="fn">run_isolation_forest</span><span class="op">(</span><span class="plain">features_df</span><span class="op">)</span>
+    <span class="plain">features_df</span><span class="op">,</span> <span class="plain">loss_history</span><span class="op">,</span> <span class="plain">y_test</span><span class="op">,</span> <span class="plain">probs_test</span><span class="op">,</span> <span class="plain">auc</span> <span class="op">=</span> <span class="fn">run_graphsage</span><span class="op">(</span><span class="plain">features_df</span><span class="op">,</span> <span class="plain">G</span><span class="op">)</span>
+    <span class="plain">results</span><span class="op">,</span> <span class="plain">flagged</span><span class="op">,</span> <span class="plain">precision</span><span class="op">,</span> <span class="plain">recall</span> <span class="op">=</span> <span class="fn">compute_ensemble</span><span class="op">(</span><span class="plain">features_df</span><span class="op">,</span> <span class="plain">THRESHOLD</span><span class="op">=</span><span class="nm">0.6</span><span class="op">)</span>
+    <span class="plain">pickle</span><span class="op">.</span><span class="fn">dump</span><span class="op">(</span><span class="plain">export</span><span class="op">,</span> <span class="fn">open</span><span class="op">(</span><span class="st">'data/results.pkl'</span><span class="op">,</span> <span class="st">'wb'</span><span class="op">))</span>
+</code></pre>
+  </div>
+
+  <!-- ── Layer 3 ── -->
+  <div class="file-section page-break">
+    <div class="file-header">
+      <span class="filename">src/layer3_detection.py</span>
+      <span class="file-desc">— Interactive detection pipeline (development / exploration entrypoint)</span>
+    </div>
+    <div class="file-explanation">
+      <strong>What it does:</strong> The interactive version of the detection pipeline used during
+      development and experimentation. It runs the same sequence as <code>export_results.py</code>
+      but prints detailed diagnostics at each stage — PyG data shape, per-epoch training loss,
+      full classification report, and a ranked table of the top 20 flagged accounts.
+      It imports the shared model and detection utilities from <code>utils.py</code>, keeping
+      the detection logic in one canonical place while allowing <code>layer3_detection.py</code>
+      to focus on exploration and <code>export_results.py</code> to focus on production output.
+    </div>
+<pre><code><span class="cm"># layer3_detection.py — key sections shown</span>
+
+<span class="kw">from</span> <span class="plain">utils</span> <span class="kw">import</span> <span class="op">(</span><span class="plain">GraphSAGE</span><span class="op">,</span> <span class="plain">engineer_node_features</span><span class="op">,</span> <span class="plain">build_pyg_data</span><span class="op">,</span>
+                   <span class="plain">run_clustering</span><span class="op">,</span> <span class="plain">run_isolation_forest</span><span class="op">)</span>
+
+
+<span class="df">def</span> <span class="fn">compute_ensemble_score</span><span class="op">(</span><span class="plain">features_df</span><span class="op">):</span>
+    <span class="cm">"""Combines GNN + community + anomaly into one per-account score."""</span>
+    <span class="plain">features_df</span><span class="op">[</span><span class="st">'ensemble_score'</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span>
+        <span class="nm">0.60</span> <span class="op">*</span> <span class="plain">features_df</span><span class="op">[</span><span class="st">'graphsage_probability'</span><span class="op">]</span> <span class="op">+</span>
+        <span class="nm">0.25</span> <span class="op">*</span> <span class="plain">features_df</span><span class="op">[</span><span class="st">'community_signal'</span><span class="op">]</span>      <span class="op">+</span>
+        <span class="nm">0.15</span> <span class="op">*</span> <span class="plain">features_df</span><span class="op">[</span><span class="st">'anomaly_signal'</span><span class="op">]</span>
+    <span class="op">)</span>
+    <span class="plain">threshold</span> <span class="op">=</span> <span class="nm">0.5</span>
+    <span class="plain">flagged</span>   <span class="op">=</span> <span class="plain">features_df</span><span class="op">[</span><span class="plain">features_df</span><span class="op">[</span><span class="st">'ensemble_score'</span><span class="op">]</span> <span class="op">&gt;</span> <span class="plain">threshold</span><span class="op">]</span>
+    <span class="plain">confirmed</span> <span class="op">=</span> <span class="plain">flagged</span><span class="op">[</span><span class="plain">flagged</span><span class="op">[</span><span class="st">'is_fraud'</span><span class="op">]</span> <span class="op">==</span> <span class="nm">1</span><span class="op">]</span>
+    <span class="plain">precision</span> <span class="op">=</span> <span class="fn">len</span><span class="op">(</span><span class="plain">confirmed</span><span class="op">)</span> <span class="op">/</span> <span class="fn">len</span><span class="op">(</span><span class="plain">flagged</span><span class="op">)</span>
+    <span class="plain">recall</span>    <span class="op">=</span> <span class="fn">len</span><span class="op">(</span><span class="plain">confirmed</span><span class="op">)</span> <span class="op">/</span> <span class="plain">features_df</span><span class="op">[</span><span class="st">'is_fraud'</span><span class="op">].</span><span class="fn">sum</span><span class="op">()</span>
+    <span class="fn">print</span><span class="op">(</span><span class="st">f"Precision: </span><span class="op">{</span><span class="plain">precision</span><span class="op">:</span><span class="st">.1%</span><span class="op">}</span><span class="st">    Recall: </span><span class="op">{</span><span class="plain">recall</span><span class="op">:</span><span class="st">.1%</span><span class="op">}</span><span class="st">"</span><span class="op">)</span>
+    <span class="kw">return</span> <span class="plain">features_df</span><span class="op">.</span><span class="fn">sort_values</span><span class="op">(</span><span class="st">'ensemble_score'</span><span class="op">,</span> <span class="plain">ascending</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>
+</code></pre>
+  </div>
+
+  <!-- ── Dashboard ── -->
+  <div class="file-section page-break">
+    <div class="file-header">
+      <span class="filename">src/layer4_dashboard.py</span>
+      <span class="file-desc">— Streamlit dashboard with five pages of results and analysis</span>
+    </div>
+    <div class="file-explanation">
+      <strong>What it does:</strong> A Streamlit web application that loads <code>results.pkl</code>
+      and presents findings across five pages: <em>Overview</em> (headline metrics and fraud
+      detection outcome pie chart), <em>Flagged Accounts</em> (searchable table of high-risk
+      accounts with human-readable column names), <em>Model Performance</em> (training loss curve,
+      ROC curve, precision-recall curve), <em>Financial Impact</em> (total money at risk, top 20
+      fraud accounts by amount sent), and <em>How It Works</em> (plain-English explanation of each
+      pipeline layer). All Plotly charts use transparent backgrounds to adapt to the Streamlit theme.
+    </div>
+<pre><code><span class="cm"># layer4_dashboard.py — key sections shown</span>
+
+<span class="plain">page</span> <span class="op">=</span> <span class="plain">st</span><span class="op">.</span><span class="plain">sidebar</span><span class="op">.</span><span class="fn">radio</span><span class="op">(</span><span class="st">"Page"</span><span class="op">,</span> <span class="op">[</span>
+    <span class="st">"Overview"</span><span class="op">,</span> <span class="st">"Flagged Accounts"</span><span class="op">,</span> <span class="st">"Model Performance"</span><span class="op">,</span>
+    <span class="st">"Financial Impact"</span><span class="op">,</span> <span class="st">"How It Works"</span>
+<span class="op">])</span>
+
+<span class="cm"># Flagged Accounts — column renaming and strict column selection</span>
+<span class="plain">display</span> <span class="op">=</span> <span class="plain">view</span><span class="op">[</span><span class="plain">cols</span><span class="op">].</span><span class="fn">head</span><span class="op">(</span><span class="nm">200</span><span class="op">).</span><span class="fn">copy</span><span class="op">()</span>
+<span class="plain">display</span><span class="op">[</span><span class="st">'ensemble_score'</span><span class="op">]</span> <span class="op">=</span> <span class="plain">display</span><span class="op">[</span><span class="st">'ensemble_score'</span><span class="op">].</span><span class="fn">round</span><span class="op">(</span><span class="nm">3</span><span class="op">)</span>
+<span class="plain">display</span><span class="op">[</span><span class="st">'is_fraud'</span><span class="op">]</span>       <span class="op">=</span> <span class="plain">display</span><span class="op">[</span><span class="st">'is_fraud'</span><span class="op">].</span><span class="fn">map</span><span class="op">({</span><span class="nm">1</span><span class="op">:</span> <span class="st">'Yes'</span><span class="op">,</span> <span class="nm">0</span><span class="op">:</span> <span class="st">'No'</span><span class="op">})</span>
+<span class="plain">display</span> <span class="op">=</span> <span class="plain">display</span><span class="op">.</span><span class="fn">rename</span><span class="op">(</span><span class="plain">columns</span><span class="op">={</span>
+    <span class="st">'node'</span><span class="op">:</span>                  <span class="st">'Account ID'</span><span class="op">,</span>
+    <span class="st">'ensemble_score'</span><span class="op">:</span>        <span class="st">'Risk Score'</span><span class="op">,</span>
+    <span class="st">'graphsage_probability'</span><span class="op">:</span> <span class="st">'Network Risk (GNN)'</span><span class="op">,</span>
+    <span class="st">'avg_balance_drop'</span><span class="op">:</span>      <span class="st">'Avg Balance Drained'</span><span class="op">,</span>
+    <span class="st">'dest_empty_rate'</span><span class="op">:</span>       <span class="st">'Sends to Empty Accounts'</span><span class="op">,</span>
+    <span class="st">'degree_ratio'</span><span class="op">:</span>          <span class="st">'Send/Receive Ratio'</span><span class="op">,</span>
+    <span class="st">'is_fraud'</span><span class="op">:</span>              <span class="st">'Confirmed Fraud'</span><span class="op">,</span>
+<span class="op">})</span>
+<span class="plain">display</span> <span class="op">=</span> <span class="plain">display</span><span class="op">.</span><span class="fn">reindex</span><span class="op">(</span><span class="plain">columns</span><span class="op">=[</span>
+    <span class="st">'Account ID'</span><span class="op">,</span> <span class="st">'Risk Score'</span><span class="op">,</span> <span class="st">'Network Risk (GNN)'</span><span class="op">,</span>
+    <span class="st">'Avg Balance Drained'</span><span class="op">,</span> <span class="st">'Sends to Empty Accounts'</span><span class="op">,</span>
+    <span class="st">'Send/Receive Ratio'</span><span class="op">,</span> <span class="st">'Confirmed Fraud'</span>
+<span class="op">])</span>
+<span class="plain">st</span><span class="op">.</span><span class="fn">dataframe</span><span class="op">(</span><span class="plain">display</span><span class="op">,</span> <span class="plain">use_container_width</span><span class="op">=</span><span class="kw">True</span><span class="op">,</span> <span class="plain">height</span><span class="op">=</span><span class="nm">600</span><span class="op">,</span> <span class="plain">hide_index</span><span class="op">=</span><span class="kw">True</span><span class="op">)</span>
+
+<span class="cm"># Financial Impact page</span>
+<span class="kw">if</span> <span class="plain">page</span> <span class="op">==</span> <span class="st">"Financial Impact"</span><span class="op">:</span>
+    <span class="plain">m1</span><span class="op">.</span><span class="fn">metric</span><span class="op">(</span><span class="st">"Total at risk"</span><span class="op">,</span>              <span class="st">f"${total_at_risk:,.0f}"</span><span class="op">)</span>
+    <span class="plain">m2</span><span class="op">.</span><span class="fn">metric</span><span class="op">(</span><span class="st">"Confirmed fraud accounts"</span><span class="op">,</span>      <span class="st">f"</span><span class="op">{</span><span class="plain">n_fraud</span><span class="op">:</span><span class="st">,}</span><span class="st">"</span><span class="op">)</span>
+    <span class="plain">m3</span><span class="op">.</span><span class="fn">metric</span><span class="op">(</span><span class="st">"Avg amount per fraud account"</span><span class="op">,</span>  <span class="st">f"${avg_per_account:,.0f}"</span><span class="op">)</span>
+    <span class="plain">bar_fig</span> <span class="op">=</span> <span class="plain">px</span><span class="op">.</span><span class="fn">bar</span><span class="op">(</span><span class="plain">top20</span><span class="op">,</span> <span class="plain">x</span><span class="op">=</span><span class="st">'node'</span><span class="op">,</span> <span class="plain">y</span><span class="op">=</span><span class="st">'total_sent'</span><span class="op">)</span>
+</code></pre>
+  </div>
+
+  <!-- ══════════════════ 6. HOW TO RUN ══════════════════ -->
+  <h2 class="page-break">6. How to Run</h2>
+
+  <h3>Prerequisites</h3>
+  <pre style="border-radius:8px; margin-bottom:16px;"><code><span class="plain">pip install pandas numpy torch torch-geometric networkx scikit-learn</span>
+<span class="plain">pip install streamlit plotly python-louvain</span></code></pre>
+
+  <h3>Step 1 — Place the dataset</h3>
+  <p>Download the PaySim dataset and save it as <code>data/transactions.csv</code> in the project root.</p>
+
+  <h3>Step 2 — Run the export pipeline</h3>
+  <pre style="border-radius:8px; margin-bottom:16px;"><code><span class="plain">cd src</span>
+<span class="plain">python export_results.py</span></code></pre>
+  <p>This trains the model, computes all scores, and writes <code>data/results.pkl</code>. Expected output:</p>
+  <pre style="border-radius:8px; margin-bottom:16px; font-size:8pt;"><code><span class="plain">=======================================================</span>
+<span class="plain">  NetTrace — Building dashboard export</span>
+<span class="plain">=======================================================</span>
+<span class="plain">Training GraphSAGE for 150 epochs (patience=30)...</span>
+<span class="plain">  Epoch 30/150  — Loss: 0.4821  Val AUC: 0.8934</span>
+<span class="plain">  Epoch 60/150  — Loss: 0.3107  Val AUC: 0.9102</span>
+<span class="plain">  Epoch 90/150  — Loss: 0.2443  Val AUC: 0.9237</span>
+<span class="plain">  Early stopping at epoch 112 (no improvement for 30 epochs)</span>
+<span class="plain">AUC: 0.9237 (best val AUC: 0.9237)</span>
+<span class="plain">✓  Saved to: ../data/results.pkl</span>
+<span class="plain">   Accounts analyzed:  79,650</span>
+<span class="plain">   Flagged high-risk:  12,415</span>
+<span class="plain">   Precision:          81.1%</span>
+<span class="plain">   AUC:                0.9237</span></code></pre>
+
+  <h3>Step 3 — Launch the dashboard</h3>
+  <pre style="border-radius:8px; margin-bottom:16px;"><code><span class="plain">python -m streamlit run layer4_dashboard.py</span></code></pre>
+  <p>Open <code>http://localhost:8501</code> in a browser. The dashboard loads instantly from the pre-computed pkl file.</p>
+
+  <!-- ══════════════════ FOOTER ══════════════════ -->
+  <div style="margin-top:56px; border-top:1px solid #e2e8f0; padding-top:20px; text-align:center; color:#94a3b8; font-size:0.82em;">
+    NetTrace &nbsp;·&nbsp; Aryan Kakkar &nbsp;·&nbsp; Graph-Based Fraud Detection
+  </div>
+
+</div>
+</body>
+</html>
