@@ -72,3 +72,36 @@ git clone https://github.com/shervin31/NetTrace.git
 cd NetTrace
 pip install -r requirements.txt
 ```
+
+## Dataset Setup
+Download the dataset from Kaggle and place it in:****
+```bash
+data/transactions.csv
+```
+
+## Usage
+Run full pipeline
+```bash
+cd src
+python layer3_detection.py
+```
+
+## Generate Dashboard Data
+```bash
+python export_results.py
+```
+
+## Launch Dashboard 
+```bash
+streamlit run layer4_dashboard.py
+```
+
+Technologies Used
+Python, Pandas, NumPy, NetworkX, PyTorch Geometric, Scikit-learn, Streamlit, Plotly
+
+## Authors
+- [Shervin Zare](https://linkedin.com/in/shervin-zare)  
+- [Aryan Kakkar](https://www.linkedin.com/in/aryan-kakkar-/)  
+- [Aatmik Bhagat](https://www.linkedin.com/in/aatmik-bhagat/)  
+
+
