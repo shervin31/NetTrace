@@ -42,7 +42,7 @@ https://www.kaggle.com/datasets/mtalaltariq/paysim-data
 - Produces a final risk score per account  
 
 📈 Interactive dashboard  
-- Streamlit dashboard for exploring results and model performance :contentReference[oaicite:0]{index=0}  
+- Streamlit dashboard for exploring results and model performance
 
 ---
 
