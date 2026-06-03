@@ -103,5 +103,3 @@ Python, Pandas, NumPy, NetworkX, PyTorch Geometric, Scikit-learn, Streamlit, Plo
 - [Shervin Zare](https://linkedin.com/in/shervin-zare)  
 - [Aryan Kakkar](https://www.linkedin.com/in/aryan-kakkar-/)  
 - [Aatmik Bhagat](https://www.linkedin.com/in/aatmik-bhagat/)  
-
-
